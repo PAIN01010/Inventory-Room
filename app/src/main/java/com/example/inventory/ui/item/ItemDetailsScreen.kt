@@ -1,18 +1,3 @@
-/*
- * Copyright (C) 2023 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 package com.example.inventory.ui.item
 
@@ -42,8 +27,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -52,16 +39,21 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.inventory.InventoryTopAppBar
 import com.example.inventory.R
 import com.example.inventory.data.Item
+import com.example.inventory.ui.AppViewModelProvider
 import com.example.inventory.ui.navigation.NavigationDestination
 import com.example.inventory.ui.theme.InventoryTheme
+import kotlinx.coroutines.launch
 
 object ItemDetailsDestination : NavigationDestination {
     override val route = "item_details"
     override val titleRes = R.string.item_detail_title
+
     const val itemIdArg = "itemId"
+
     val routeWithArgs = "$route/{$itemIdArg}"
 }
 
@@ -70,37 +62,70 @@ object ItemDetailsDestination : NavigationDestination {
 fun ItemDetailsScreen(
     navigateToEditItem: (Int) -> Unit,
     navigateBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: ItemDetailsViewModel = viewModel(
+        factory = AppViewModelProvider.Factory
+    )
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+
     Scaffold(
         topBar = {
             InventoryTopAppBar(
-                title = stringResource(ItemDetailsDestination.titleRes),
+                title = stringResource(
+                    ItemDetailsDestination.titleRes
+                ),
                 canNavigateBack = true,
                 navigateUp = navigateBack
             )
-        }, floatingActionButton = {
+        },
+        floatingActionButton = {
             FloatingActionButton(
-                onClick = { navigateToEditItem(0) },
+                onClick = {
+                    navigateToEditItem(
+                        uiState.itemDetails.id
+                    )
+                },
                 shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_large))
-
+                modifier = Modifier.padding(
+                    dimensionResource(
+                        id = R.dimen.padding_large
+                    )
+                )
             ) {
                 Icon(
                     imageVector = Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.edit_item_title),
+                    contentDescription = stringResource(
+                        R.string.edit_item_title
+                    )
                 )
             }
-        }, modifier = modifier
+        },
+        modifier = modifier
     ) { innerPadding ->
+
         ItemDetailsBody(
-            itemDetailsUiState = ItemDetailsUiState(),
-            onSellItem = { },
-            onDelete = { },
+            itemDetailsUiState = uiState,
+            onSellItem = {
+                coroutineScope.launch {
+                    viewModel.reduceQuantityByOne()
+                }
+            },
+            onDelete = {
+                coroutineScope.launch {
+                    viewModel.deleteItem()
+                    navigateBack()
+                }
+            },
             modifier = Modifier
                 .padding(
-                    start = innerPadding.calculateStartPadding(LocalLayoutDirection.current),
-                    end = innerPadding.calculateEndPadding(LocalLayoutDirection.current),
+                    start = innerPadding.calculateStartPadding(
+                        LocalLayoutDirection.current
+                    ),
+                    end = innerPadding.calculateEndPadding(
+                        LocalLayoutDirection.current
+                    ),
                     top = innerPadding.calculateTopPadding()
                 )
                 .verticalScroll(rememberScrollState())
@@ -116,38 +141,63 @@ private fun ItemDetailsBody(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.padding(dimensionResource(id = R.dimen.padding_medium)),
-        verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_medium))
+        modifier = modifier.padding(
+            dimensionResource(
+                id = R.dimen.padding_medium
+            )
+        ),
+        verticalArrangement = Arrangement.spacedBy(
+            dimensionResource(
+                id = R.dimen.padding_medium
+            )
+        )
     ) {
-        var deleteConfirmationRequired by rememberSaveable { mutableStateOf(false) }
+        var deleteConfirmationRequired by rememberSaveable {
+            mutableStateOf(false)
+        }
 
         ItemDetails(
             item = itemDetailsUiState.itemDetails.toItem(),
             modifier = Modifier.fillMaxWidth()
         )
+
         Button(
             onClick = onSellItem,
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.small,
-            enabled = true
+            enabled = !itemDetailsUiState.outOfStock
         ) {
-            Text(stringResource(R.string.sell))
+            Text(
+                text = stringResource(R.string.sell)
+            )
         }
+
         OutlinedButton(
-            onClick = { deleteConfirmationRequired = true },
+            onClick = {
+                deleteConfirmationRequired = true
+            },
             shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(stringResource(R.string.delete))
+            Text(
+                text = stringResource(R.string.delete)
+            )
         }
+
         if (deleteConfirmationRequired) {
             DeleteConfirmationDialog(
                 onDeleteConfirm = {
                     deleteConfirmationRequired = false
                     onDelete()
                 },
-                onDeleteCancel = { deleteConfirmationRequired = false },
-                modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_medium))
+                onDeleteCancel = {
+                    deleteConfirmationRequired = false
+                },
+                modifier = Modifier.padding(
+                    dimensionResource(
+                        id = R.dimen.padding_medium
+                    )
+                )
             )
         }
     }
@@ -155,42 +205,59 @@ private fun ItemDetailsBody(
 
 @Composable
 fun ItemDetails(
-    item: Item, modifier: Modifier = Modifier
+    item: Item,
+    modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            containerColor =
+                MaterialTheme.colorScheme.primaryContainer,
+            contentColor =
+                MaterialTheme.colorScheme.onPrimaryContainer
         )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(dimensionResource(id = R.dimen.padding_medium)),
+                .padding(
+                    dimensionResource(
+                        id = R.dimen.padding_medium
+                    )
+                ),
             verticalArrangement = Arrangement.spacedBy(
-                dimensionResource(id = R.dimen.padding_medium)
+                dimensionResource(
+                    id = R.dimen.padding_medium
+                )
             )
         ) {
             ItemDetailsRow(
                 labelResID = R.string.item,
                 itemDetail = item.name,
                 modifier = Modifier.padding(
-                    horizontal = dimensionResource(id = R.dimen.padding_medium)
+                    horizontal = dimensionResource(
+                        id = R.dimen.padding_medium
+                    )
                 )
             )
+
             ItemDetailsRow(
                 labelResID = R.string.quantity_in_stock,
                 itemDetail = item.quantity.toString(),
                 modifier = Modifier.padding(
-                    horizontal = dimensionResource(id = R.dimen.padding_medium)
+                    horizontal = dimensionResource(
+                        id = R.dimen.padding_medium
+                    )
                 )
             )
+
             ItemDetailsRow(
                 labelResID = R.string.price,
                 itemDetail = item.formatedPrice(),
                 modifier = Modifier.padding(
-                    horizontal = dimensionResource(id = R.dimen.padding_medium)
+                    horizontal = dimensionResource(
+                        id = R.dimen.padding_medium
+                    )
                 )
             )
         }
@@ -199,12 +266,23 @@ fun ItemDetails(
 
 @Composable
 private fun ItemDetailsRow(
-    @StringRes labelResID: Int, itemDetail: String, modifier: Modifier = Modifier
+    @StringRes labelResID: Int,
+    itemDetail: String,
+    modifier: Modifier = Modifier
 ) {
     Row(modifier = modifier) {
-        Text(stringResource(labelResID))
-        Spacer(modifier = Modifier.weight(1f))
-        Text(text = itemDetail, fontWeight = FontWeight.Bold)
+        Text(
+            text = stringResource(labelResID)
+        )
+
+        Spacer(
+            modifier = Modifier.weight(1f)
+        )
+
+        Text(
+            text = itemDetail,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -214,20 +292,30 @@ private fun DeleteConfirmationDialog(
     onDeleteCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    AlertDialog(onDismissRequest = { /* Do nothing */ },
-        title = { Text(stringResource(R.string.attention)) },
-        text = { Text(stringResource(R.string.delete_question)) },
+    AlertDialog(
+        onDismissRequest = onDeleteCancel,
+        title = {
+            Text(stringResource(R.string.attention))
+        },
+        text = {
+            Text(stringResource(R.string.delete_question))
+        },
         modifier = modifier,
         dismissButton = {
-            TextButton(onClick = onDeleteCancel) {
+            TextButton(
+                onClick = onDeleteCancel
+            ) {
                 Text(stringResource(R.string.no))
             }
         },
         confirmButton = {
-            TextButton(onClick = onDeleteConfirm) {
+            TextButton(
+                onClick = onDeleteConfirm
+            ) {
                 Text(stringResource(R.string.yes))
             }
-        })
+        }
+    )
 }
 
 @Preview(showBackground = true)
@@ -235,9 +323,14 @@ private fun DeleteConfirmationDialog(
 fun ItemDetailsScreenPreview() {
     InventoryTheme {
         ItemDetailsBody(
-            ItemDetailsUiState(
-                outOfStock = true,
-                itemDetails = ItemDetails(1, "Pen", "$100", "10")
+            itemDetailsUiState = ItemDetailsUiState(
+                outOfStock = false,
+                itemDetails = ItemDetails(
+                    id = 1,
+                    name = "Pen",
+                    price = "100",
+                    quantity = "10"
+                )
             ),
             onSellItem = {},
             onDelete = {}

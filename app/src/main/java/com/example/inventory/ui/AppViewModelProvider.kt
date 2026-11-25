@@ -1,18 +1,3 @@
-/*
- * Copyright (C) 2023 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 package com.example.inventory.ui
 
@@ -29,38 +14,55 @@ import com.example.inventory.ui.item.ItemEditViewModel
 import com.example.inventory.ui.item.ItemEntryViewModel
 
 /**
- * Provides Factory to create instance of ViewModel for the entire Inventory app
+ * Proporciona los ViewModels y sus dependencias
+ * para la aplicación Inventory.
  */
 object AppViewModelProvider {
+
     val Factory = viewModelFactory {
-        // Initializer for ItemEditViewModel
+
+        // ViewModel para editar productos
         initializer {
             ItemEditViewModel(
-                this.createSavedStateHandle()
+                this.createSavedStateHandle(),
+                inventoryApplication()
+                    .container
+                    .itemsRepository
             )
         }
-        // Initializer for ItemEntryViewModel
+
+        // ViewModel para registrar productos
         initializer {
-            ItemEntryViewModel()
+            ItemEntryViewModel(
+                inventoryApplication()
+                    .container
+                    .itemsRepository
+            )
         }
 
-        // Initializer for ItemDetailsViewModel
+        // ViewModel para consultar, vender y eliminar
         initializer {
             ItemDetailsViewModel(
-                this.createSavedStateHandle()
+                this.createSavedStateHandle(),
+                inventoryApplication()
+                    .container
+                    .itemsRepository
             )
         }
 
-        // Initializer for HomeViewModel
+        // ViewModel de la pantalla principal
         initializer {
-            HomeViewModel()
+            HomeViewModel(
+                inventoryApplication()
+                    .container
+                    .itemsRepository
+            )
         }
     }
 }
 
 /**
- * Extension function to queries for [Application] object and returns an instance of
- * [InventoryApplication].
+ * Obtiene InventoryApplication desde CreationExtras.
  */
 fun CreationExtras.inventoryApplication(): InventoryApplication =
     (this[AndroidViewModelFactory.APPLICATION_KEY] as InventoryApplication)
